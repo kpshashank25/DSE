@@ -1,48 +1,79 @@
-#include <stdio.h> 
-int check(int day, int month) 
-{ 
-if ((month == 4 || month == 6 || month == 9 || month == 11) && day == 31) 
-{ 
-return 1; 
-} return 0; 
-} int isleap(int year) 
-{ if ((year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)) 
-{ 
-return 1; 
-} return 0; 
+import time
+import csv
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from webdriver_manager.chrome import ChromeDriverManager
 
- } 
-int days_in_month(int month, int year) 
-{ 
-switch (month) 
-{ case 1: case 3: case 5: case 7: case 8: case 10: case 12: return 31; case 4: case 6: case 9: case 11: return 30; case 2: 
-return isleap(year) ? 29 : 28; 
-} 
-} 
-int main()
- {
- int day, month, year;
- printf("Enter the date in the form of DD-MM-YYYY: "); 
-scanf("%d-%d-%d", &day, &month, &year); 
-if (year < 1) { printf("Invalid year\n"); return 1; } 
-if (month < 1 || month > 12 || check(day, month) || day < 1 || day > days_in_month(month, year))
- { 
-printf("Invalid date\n"); 
-return 1; 
-} 
-day++; 
-if (day > days_in_month(month, year)) 
-{ day = 1; month++; if (month > 12) 
-{ 
-month = 1; year++; } }
- if (year > 2012) 
-{ printf("Out of range\n");
- return 1; 
-} 
-printf("The next day is: %02d-%02d-%d\n", day, month, year); 
-return 0; 
-} 
+def fetch_flat_apartment_prices_to_csv():
+    try:
+        # Setup Chrome options
+        options = Options()
+        options.add_argument("--start-maximized")  # Start browser maximized
+        service = Service(ChromeDriverManager().install())  # Auto-manage driver
+        driver = webdriver.Chrome(service=service, options=options)
 
+        # Open Housing.com
+        driver.get('https://housing.com/')
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CLASS_NAME, "css-1s4ak33"))
+        )
+
+        # Search for Bangalore
+        search_box = driver.find_element(By.CLASS_NAME, "css-1s4ak33")
+        ActionChains(driver).click(search_box).send_keys("Bangalore").send_keys(Keys.RETURN).perform()
+        print("Typing 'Bangalore' and pressing Enter...")
+        time.sleep(5)  # Wait for results to load
+
+        # Open CSV file to save data
+        with open('property_listings.csv', mode='w', newline='', encoding='utf-8') as file:
+            writer = csv.writer(file)
+            writer.writerow(["Location", "Price"])  # Header row
+
+            # Extract property details
+            count = 0
+            while count < 10:  # Limit to the first 10 entries
+                try:
+                    # Refined XPath for price and location
+                    price_xpath = f"//*[@id='srp-{count + 1}']/div[1]/div[2]/div[1]/div[1]/div[1]/div"
+                    location_xpath = f"//*[@id='srp-{count + 1}']/div[1]/div[2]/div[1]/h3/span"
+
+                    # Wait for elements to load
+                    price_element = WebDriverWait(driver, 10).until(
+                        EC.presence_of_element_located((By.XPATH, price_xpath))
+                    )
+                    location_element = WebDriverWait(driver, 10).until(
+                        EC.presence_of_element_located((By.XPATH, location_xpath))
+                    )
+
+                    # Extract text
+                    price = price_element.text
+                    location = location_element.text
+
+                    # Write to CSV
+                    print(f"Location: {location}, Price: {price}")
+                    writer.writerow([location, price])
+                    count += 1
+
+                except Exception as e:
+                    print(f"Error extracting property details for entry {count + 1}: {e}")
+                    break
+
+        print("Property listings saved to 'property_listings.csv'.")
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+    finally:
+        driver.quit()
+
+# Run the function
+fetch_flat_apartment_prices_to_csv()
 
 
 
